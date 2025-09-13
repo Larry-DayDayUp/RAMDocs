@@ -152,20 +152,29 @@ def main():
         bnb_4bit_use_double_quant=True,
     )
 
-    model = AutoModelForCausalLM.from_pretrained(
+    """model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
-        quantization_config=bnb_config,
+        #quantization_config=bnb_config,
         torch_dtype=torch.float16,
         cache_dir=args.cache_dir,
         token=hf_token,
-    )
+    )"""
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name,
+        torch_dtype=torch.float16,
+        cache_dir=args.cache_dir,
+        token=hf_token,
+        device_map="auto"  # 确保这行存在
+    ).to('cuda')  # 添加这行强制使用GPU
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, cache_dir=args.cache_dir, token=hf_token)
     tokenizer.pad_token_id = tokenizer.eos_token_id
     generator = pipeline("text-generation", model=model, tokenizer=tokenizer, trust_remote_code=True, device_map="auto")
 
+    
     with open(args.data_path, "r") as f:
         all_data = [json.loads(line.strip()) for line in f]
+        all_data = all_data[:50]  # 只处理前50个样本
 
     results = []
     for i in tqdm(range(len(all_data)), desc="Running MADAM-RAG"):
@@ -178,5 +187,10 @@ def main():
         for result in results:
             f.write(json.dumps(result) + "\n")
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": 
+    import torch
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    print(f"GPU count: {torch.cuda.device_count()}")
+    if torch.cuda.is_available():
+        print(f"GPU name: {torch.cuda.get_device_name(0)}")
+    main() 
